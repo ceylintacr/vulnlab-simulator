@@ -29,15 +29,17 @@ def init_db():
                 id INTEGER PRIMARY KEY,
                 kullanici_adi TEXT NOT NULL,
                 sifre TEXT NOT NULL,
-                rol TEXT NOT NULL
+                rol TEXT NOT NULL,
+                gizli_not TEXT NOT NULL
             )
         """)
         conn.executemany(
-            "INSERT INTO kullanicilar (kullanici_adi, sifre, rol) VALUES (?, ?, ?)",
+            "INSERT INTO kullanicilar (kullanici_adi, sifre, rol, gizli_not) VALUES (?, ?, ?, ?)",
             [
-                ("admin", "Xk9#mQ2$vL7!pR4z", "yönetici"),  # tahmin edilemeyecek kadar güçlü bir şifre
-                ("ceylin", "kedi2024", "kullanıcı"),
-                ("ahmet", "ahmet123", "kullanıcı"),
+                # id=1 admin, id=2 ceylin, id=3 ahmet  (Seviye 3 IDOR için id'ler önemli)
+                ("admin", "Xk9#mQ2$vL7!pR4z", "yönetici", "Sunucu kurtarma kodu: ROOT-9931-SECRET"),
+                ("ceylin", "kedi2024", "kullanıcı", "Kredi kartı son 4 hane: 4821"),
+                ("ahmet", "ahmet123", "kullanıcı", "Ev adresi: Ornek Mah. 12. Sok. No:3"),
             ],
         )
         # Seviye 2 (XSS): Kullanıcıların birbirine mesaj bıraktığı pano
@@ -79,6 +81,7 @@ def login():
             hata = f"Veritabanı hatası: {e}"
 
         if kullanici:
+            session["id"] = kullanici["id"]
             session["kullanici_adi"] = kullanici["kullanici_adi"]
             session["rol"] = kullanici["rol"]
             return redirect(url_for("panel"))
@@ -114,6 +117,29 @@ def mesajlar():
     with get_db() as conn:
         kayitlar = conn.execute("SELECT yazar, icerik FROM mesajlar ORDER BY id").fetchall()
     return render_template("mesajlar.html", kayitlar=kayitlar)
+
+
+@app.route("/hesap/<int:kid>")
+def hesap(kid):
+    if "kullanici_adi" not in session:
+        return redirect(url_for("login"))
+
+    # ❌ ESKİ (AÇIK): İstenen 'kid' numarasının giriş yapan kişiye ait olup olmadığı
+    #    hiç kontrol edilmiyordu; herkes /hesap/<baska-numara> ile başkasının notunu görebiliyordu.
+    #
+    # ✅ YENİ (GÜVENLİ): Yetkilendirme kontrolü. Kullanıcı yalnızca KENDİ hesabını görebilir.
+    #    Yöneticiler (rol == "yönetici") istisna; onlar tüm hesaplara erişebilir.
+    if kid != session["id"] and session["rol"] != "yönetici":
+        return "Bu hesabi goruntuleme yetkiniz yok.", 403
+
+    with get_db() as conn:
+        kullanici = conn.execute(
+            "SELECT kullanici_adi, gizli_not FROM kullanicilar WHERE id = ?", (kid,)
+        ).fetchone()
+
+    if not kullanici:
+        return "Boyle bir hesap yok.", 404
+    return render_template("hesap.html", hesap=kullanici, kid=kid)
 
 
 @app.route("/cikis")

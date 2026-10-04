@@ -7,6 +7,7 @@
   <p class="success">Tebrikler! Yonetici paneline eristin.</p>
   {% endif %}
   <p><a href="{{ url_for('mesajlar') }}">Mesaj panosuna git</a></p>
+  <p><a href="{{ url_for('hesap', kid=session['id']) }}">Hesabim</a></p>
   <a href="{{ url_for('cikis') }}">Cikis yap</a>
 </section>
 {% endblock %}

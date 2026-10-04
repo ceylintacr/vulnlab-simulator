@@ -103,10 +103,50 @@ Her iki açık da **veri ile komutun birbirine karışmasından** doğar: SQLi'd
 
 ---
 
+## Seviye 3: IDOR (Insecure Direct Object Reference)
+
+### Açık
+"Hesabım" sayfası, adresteki numarayla (`/hesap/<id>`) doğrudan veri çekiyordu ama bu numaranın giriş yapan kullanıcıya ait olup olmadığını **kontrol etmiyordu**. Bu bir **yetkilendirme (authorization) eksikliğidir**.
+
+### İstismar
+`ceylin` (id=2) olarak giriş yapıp adresteki numarayı değiştirmek, başka kullanıcıların gizli verisini açığa çıkarır:
+
+| Adres | Sonuç |
+|---|---|
+| `/hesap/2` | Kendi bilgisi (normal) |
+| `/hesap/1` | 🚩 admin'in gizli kurtarma kodu |
+| `/hesap/3` | 🚩 ahmet'in ev adresi |
+
+Hiçbir özel girdi veya kod gerekmez; yalnızca URL'deki sayı değiştirilir.
+
+### Çözüm: Yetkilendirme (sahiplik) kontrolü
+
+```python
+# ❌ Açık: istenen kaydın sahibi kim, kontrol edilmiyor
+kullanici = conn.execute("SELECT ... WHERE id = ?", (kid,)).fetchone()
+
+# ✅ Güvenli: kullanıcı yalnızca kendi kaydına erişebilir (yönetici istisna)
+if kid != session["id"] and session["rol"] != "yönetici":
+    return "Bu hesabi goruntuleme yetkiniz yok.", 403
+```
+
+### Doğrulama
+| Kullanıcı | İstek | Açık sürüm | Güvenli sürüm |
+|---|---|---|---|
+| ceylin | `/hesap/2` (kendi) | 200 | 200 |
+| ceylin | `/hesap/1` (admin) | 🚩 200 | 403 |
+| ceylin | `/hesap/3` (ahmet) | 🚩 200 | 403 |
+| admin | `/hesap/2` | 200 | 200 (yönetici istisnası) |
+
+### Öncekilerden farkı
+SQLi ve XSS, **girdinin işlenmesindeki** hatadan doğar; çözümleri girdiyi güvenli işlemektir. IDOR ise **eksik bir yetki kontrolünden** doğar; girdide bir sorun yoktur, sunucunun "bu veriye erişim hakkın var mı?" sorusunu sorması gerekir.
+
+---
+
 ## Yol haritası
 - [x] Seviye 1 — SQL Injection
 - [x] Seviye 2 — XSS (Cross-Site Scripting)
-- [ ] Seviye 3 — IDOR (yetkisiz veri erişimi)
+- [x] Seviye 3 — IDOR (yetkisiz veri erişimi)
 - [ ] Seviye 4 — Zayıf şifre saklama (hash & bcrypt)
 
 ## Teknolojiler

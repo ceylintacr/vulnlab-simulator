@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Hesap #{{ kid }}</h1>
+<p class="muted">Seviye 3: IDOR</p>
+
+<section class="card">
+  <p>Kullanici adi: <strong>{{ hesap.kullanici_adi }}</strong></p>
+  <p>Gizli not:</p>
+  <p class="error">{{ hesap.gizli_not }}</p>
+</section>
+
+<p class="muted">Adres cubugundaki numarayi degistirmeyi dene: /hesap/1, /hesap/2, /hesap/3</p>
+<p><a href="{{ url_for('panel') }}">Panele don</a></p>
+{% endblock %}
