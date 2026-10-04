@@ -108,3 +108,11 @@ pre {
 }
 
 a { color: var(--accent); }
+
+.mesaj {
+  border-top: 1px solid var(--border);
+  padding: 10px 0;
+}
+.mesaj:first-of-type { border-top: 0; }
+.mesaj strong { color: var(--accent); font-size: 0.9rem; }
+.mesaj p { margin: 4px 0 0; }

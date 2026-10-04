@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Mesaj Panosu</h1>
+<p class="muted">Seviye 2: XSS (Cross-Site Scripting)</p>
+
+<form method="post" class="card" autocomplete="off">
+  <label>Mesajin
+    <input name="icerik" spellcheck="false" autofocus placeholder="Bir mesaj yaz...">
+  </label>
+  <button type="submit">Gonder</button>
+</form>
+
+<section class="card">
+  <h2>Mesajlar</h2>
+  {% for kayit in kayitlar %}
+    <div class="mesaj">
+      <strong>{{ kayit.yazar }}</strong>
+      {# ESKI (ACIK):   <p>{{ kayit.icerik | safe }}</p>  -> '| safe' otomatik kacisi kapatir, XSS'e yol acar #}
+      {# YENI (GUVENLI): '| safe' kaldirildi. Flask artik <, >, " gibi karakterleri otomatik kacirir; #}
+      {#                 kullanici girdisi KOD olarak degil, duz METIN olarak gosterilir. #}
+      <p>{{ kayit.icerik }}</p>
+    </div>
+  {% endfor %}
+</section>
+
+<p><a href="{{ url_for('panel') }}">Panele don</a></p>
+{% endblock %}

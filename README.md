@@ -66,9 +66,46 @@ Parametreli sorguda veritabanı önce cümlenin yapısını sabitler; `?` yerine
 
 ---
 
+## Seviye 2: XSS (Cross-Site Scripting)
+
+### Açık
+Mesaj panosu, kullanıcıların yazdığı mesajları `{{ icerik | safe }}` ile basıyordu. Jinja2'deki `| safe` filtresi, Flask'ın otomatik HTML kaçışını **devre dışı bırakır**. Böylece mesaja gömülen HTML/JavaScript, o sayfayı açan herkesin tarayıcısında çalışır. Zararlı kod veritabanında saklandığı için bu bir **Stored XSS**'tir.
+
+### İstismar
+Mesaj alanına yazılan şu girdiler, panoyu açan herkeste çalışır:
+
+```html
+<script>alert('XSS')</script>
+<img src=x onerror="document.body.style.background='crimson';document.title='HACKED'">
+```
+
+`<img onerror>` yöntemi, sayfa yüklendikten sonra eklenen `<script>` etiketlerinin çalışmaması sorununu aştığı için XSS testlerinde tercih edilir.
+
+### Çözüm: Otomatik HTML kaçışı
+
+```html
+<!-- ❌ Açık: '| safe' otomatik kaçışı kapatır -->
+<p>{{ icerik | safe }}</p>
+
+<!-- ✅ Güvenli: Flask <, >, " karakterlerini otomatik kaçırır; girdi kod değil, metin olarak görünür -->
+<p>{{ icerik }}</p>
+```
+
+### Doğrulama
+| Girdi | Açık sürüm | Güvenli sürüm |
+|---|---|---|
+| `<script>...</script>` | 🚩 Kod çalışır | ❌ `&lt;script&gt;` olarak metin görünür |
+| `<img onerror=...>` | 🚩 Kod çalışır | ❌ Metin olarak görünür |
+| Normal mesaj | ✅ Görünür | ✅ Görünür |
+
+### SQL Injection ile ortak nokta
+Her iki açık da **veri ile komutun birbirine karışmasından** doğar: SQLi'de girdi veritabanı sorgusuna, XSS'te ise HTML sayfasına karışır. Çözüm de aynıdır: veriyi komuttan ayrı tutmak (parametreli sorgu / otomatik kaçış).
+
+---
+
 ## Yol haritası
 - [x] Seviye 1 — SQL Injection
-- [ ] Seviye 2 — XSS (Cross-Site Scripting)
+- [x] Seviye 2 — XSS (Cross-Site Scripting)
 - [ ] Seviye 3 — IDOR (yetkisiz veri erişimi)
 - [ ] Seviye 4 — Zayıf şifre saklama (hash & bcrypt)
 

@@ -40,6 +40,18 @@ def init_db():
                 ("ahmet", "ahmet123", "kullanıcı"),
             ],
         )
+        # Seviye 2 (XSS): Kullanıcıların birbirine mesaj bıraktığı pano
+        conn.execute("""
+            CREATE TABLE mesajlar (
+                id INTEGER PRIMARY KEY,
+                yazar TEXT NOT NULL,
+                icerik TEXT NOT NULL
+            )
+        """)
+        conn.execute(
+            "INSERT INTO mesajlar (yazar, icerik) VALUES (?, ?)",
+            ("ahmet", "Herkese merhaba! Bu panoya mesaj bırakabilirsiniz."),
+        )
 
 
 # ---------------------------------------------------------------- Sayfalar
@@ -82,6 +94,26 @@ def panel():
     if "kullanici_adi" not in session:
         return redirect(url_for("login"))
     return render_template("panel.html", kullanici_adi=session["kullanici_adi"], rol=session["rol"])
+
+
+@app.route("/mesajlar", methods=["GET", "POST"])
+def mesajlar():
+    if "kullanici_adi" not in session:
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        icerik = request.form.get("icerik", "").strip()
+        if icerik:
+            with get_db() as conn:
+                conn.execute(
+                    "INSERT INTO mesajlar (yazar, icerik) VALUES (?, ?)",
+                    (session["kullanici_adi"], icerik),
+                )
+        return redirect(url_for("mesajlar"))
+
+    with get_db() as conn:
+        kayitlar = conn.execute("SELECT yazar, icerik FROM mesajlar ORDER BY id").fetchall()
+    return render_template("mesajlar.html", kayitlar=kayitlar)
 
 
 @app.route("/cikis")
