@@ -143,11 +143,49 @@ SQLi ve XSS, **girdinin işlenmesindeki** hatadan doğar; çözümleri girdiyi g
 
 ---
 
+## Seviye 4: Zayıf Şifre Saklama
+
+### Açık
+Şifreler veritabanında **düz metin** olarak saklanıyordu. Veritabanı herhangi bir yolla ele geçirilirse (ör. Seviye 1'deki SQL Injection veya sızan bir yedek), tüm şifreler doğrudan okunabilir:
+
+```
+admin   : Xk9#mQ2$vL7!pR4z
+ceylin  : kedi2024
+ahmet   : ahmet123
+```
+
+Şifrenin güçlü olması bu durumda işe yaramaz; düz metin saklandığı için admin'in güçlü şifresi bile açığa çıkar. Kullanıcılar şifrelerini başka sitelerde de kullandığından etki tek siteyle sınırlı kalmaz.
+
+### Çözüm: Şifreyi hash'leyerek saklamak
+
+```python
+# ❌ Açık: düz metin saklanır, giriş için düz karşılaştırma yapılır
+("ceylin", "kedi2024", ...)
+kullanici = conn.execute("SELECT * ... WHERE kullanici_adi=? AND sifre=?", (ad, sifre))
+
+# ✅ Güvenli: hash saklanır, girişte hash doğrulanır (werkzeug)
+("ceylin", generate_password_hash("kedi2024"), ...)
+kullanici = conn.execute("SELECT * ... WHERE kullanici_adi=?", (ad,))
+if kullanici and check_password_hash(kullanici["sifre"], sifre):
+    ...
+```
+
+Hash tek yönlüdür (geri döndürülemez) ve scrypt/bcrypt gibi algoritmalar kasten yavaştır; bu, çalınan veritabanı üzerinde kaba kuvvetle şifre kırmayı zorlaştırır.
+
+### Doğrulama
+| Durum | Açık sürüm | Güvenli sürüm |
+|---|---|---|
+| Veritabanındaki şifre | `kedi2024` (düz metin) | `scrypt:32768:8:1$...` (hash) |
+| Doğru şifreyle giriş | ✅ | ✅ |
+| Yanlış şifreyle giriş | ❌ | ❌ |
+
+---
+
 ## Yol haritası
 - [x] Seviye 1 — SQL Injection
 - [x] Seviye 2 — XSS (Cross-Site Scripting)
 - [x] Seviye 3 — IDOR (yetkisiz veri erişimi)
-- [ ] Seviye 4 — Zayıf şifre saklama (hash & bcrypt)
+- [x] Seviye 4 — Zayıf şifre saklama (hash)
 
 ## Teknolojiler
 Python, Flask, SQLite

@@ -5,6 +5,7 @@ import sqlite3
 from pathlib import Path
 
 from flask import Flask, render_template, request, session, redirect, url_for
+from werkzeug.security import generate_password_hash, check_password_hash  # Seviye 4: güvenli şifre saklama
 
 BASE = Path(__file__).parent
 DB_PATH = BASE / "vulnlab.db"
@@ -33,13 +34,16 @@ def init_db():
                 gizli_not TEXT NOT NULL
             )
         """)
+        # ✅ Seviye 4 (GÜVENLİ): Şifreler düz metin DEĞİL, hash'lenerek saklanıyor.
+        #    generate_password_hash her şifreyi tek yönlü, geri döndürülemez bir değere çevirir.
+        #    Veritabanı çalınsa bile gerçek şifreler okunamaz.
         conn.executemany(
             "INSERT INTO kullanicilar (kullanici_adi, sifre, rol, gizli_not) VALUES (?, ?, ?, ?)",
             [
                 # id=1 admin, id=2 ceylin, id=3 ahmet  (Seviye 3 IDOR için id'ler önemli)
-                ("admin", "Xk9#mQ2$vL7!pR4z", "yönetici", "Sunucu kurtarma kodu: ROOT-9931-SECRET"),
-                ("ceylin", "kedi2024", "kullanıcı", "Kredi kartı son 4 hane: 4821"),
-                ("ahmet", "ahmet123", "kullanıcı", "Ev adresi: Ornek Mah. 12. Sok. No:3"),
+                ("admin", generate_password_hash("Xk9#mQ2$vL7!pR4z"), "yönetici", "Sunucu kurtarma kodu: ROOT-9931-SECRET"),
+                ("ceylin", generate_password_hash("kedi2024"), "kullanıcı", "Kredi kartı son 4 hane: 4821"),
+                ("ahmet", generate_password_hash("ahmet123"), "kullanıcı", "Ev adresi: Ornek Mah. 12. Sok. No:3"),
             ],
         )
         # Seviye 2 (XSS): Kullanıcıların birbirine mesaj bıraktığı pano
@@ -66,21 +70,21 @@ def login():
         kullanici_adi = request.form.get("kullanici_adi", "")
         sifre = request.form.get("sifre", "")
 
-        # ❌ ESKİ (AÇIK): Girdi doğrudan SQL metninin içine yapıştırılıyordu. SQL Injection'a açıktı.
-        #    sorgu = f"SELECT * FROM kullanicilar WHERE kullanici_adi = '{kullanici_adi}' AND sifre = '{sifre}'"
-        #
-        # ✅ YENİ (GÜVENLİ): Parametreli sorgu. Komutun yapısı sabit; '?' yerine gelen değerler
-        #    HER ZAMAN veri olarak işlenir, asla komut olarak çalışmaz. Tırnak artık zararsız.
-        sorgu = "SELECT * FROM kullanicilar WHERE kullanici_adi = ? AND sifre = ?"
+        # Seviye 1 (GÜVENLİ): Parametreli sorgu, SQL Injection'a karşı. ('sifre = ?' yerine
+        # artık yalnızca kullanıcı adıyla kaydı çekiyoruz; şifreyi aşağıda hash ile doğruluyoruz.)
+        # ❌ ESKİ (AÇIK): f"... kullanici_adi = '{kullanici_adi}' AND sifre = '{sifre}'"  -> SQL Injection
+        sorgu = "SELECT * FROM kullanicilar WHERE kullanici_adi = ?"
 
         try:
             with get_db() as conn:
-                kullanici = conn.execute(sorgu, (kullanici_adi, sifre)).fetchone()
+                kullanici = conn.execute(sorgu, (kullanici_adi,)).fetchone()
         except sqlite3.Error as e:
             kullanici = None
             hata = f"Veritabanı hatası: {e}"
 
-        if kullanici:
+        # Seviye 4 (GÜVENLİ): Yazılan şifrenin hash'i, saklanan hash ile karşılaştırılır.
+        # ❌ ESKİ (AÇIK): şifreler düz metin saklanıp 'sifre == girdi' diye karşılaştırılıyordu.
+        if kullanici and check_password_hash(kullanici["sifre"], sifre):
             session["id"] = kullanici["id"]
             session["kullanici_adi"] = kullanici["kullanici_adi"]
             session["rol"] = kullanici["rol"]
