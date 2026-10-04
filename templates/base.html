@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VulnLab</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="warning">Egitim amacli, kasitli olarak acikli uygulama. Yalnizca yerel bilgisayarda calistir.</div>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

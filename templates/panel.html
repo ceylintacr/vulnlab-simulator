@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Hos geldin, {{ kullanici_adi }}!</h1>
+<section class="card">
+  <p>Rolun: <strong>{{ rol }}</strong></p>
+  {% if rol == "yönetici" %}
+  <p class="success">Tebrikler! Yonetici paneline eristin.</p>
+  {% endif %}
+  <a href="{{ url_for('cikis') }}">Cikis yap</a>
+</section>
+{% endblock %}

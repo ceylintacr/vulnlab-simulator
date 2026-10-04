@@ -1,0 +1,97 @@
+# VulnLab: Kasıtlı olarak AÇIKLI yazılmış eğitim amaçlı web uygulaması.
+# UYARI: Bu kodu asla internete açık bir sunucuda çalıştırma! Sadece kendi bilgisayarında (127.0.0.1) çalışır.
+
+import sqlite3
+from pathlib import Path
+
+from flask import Flask, render_template, request, session, redirect, url_for
+
+BASE = Path(__file__).parent
+DB_PATH = BASE / "vulnlab.db"
+
+app = Flask(__name__)
+app.secret_key = "egitim-amacli-gizli-anahtar"  # oturum çerezlerini imzalamak için (gerçek projede rastgele ve gizli olmalı)
+
+
+# ---------------------------------------------------------------- Veritabanı
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row  # satırlara row["kullanici_adi"] diye erişebilmek için
+    return conn
+
+
+def init_db():
+    """Her başlatmada veritabanını sıfırdan kurar, böylece denemelerin kalıcı bir şeyi bozmaz."""
+    DB_PATH.unlink(missing_ok=True)
+    with get_db() as conn:
+        conn.execute("""
+            CREATE TABLE kullanicilar (
+                id INTEGER PRIMARY KEY,
+                kullanici_adi TEXT NOT NULL,
+                sifre TEXT NOT NULL,
+                rol TEXT NOT NULL
+            )
+        """)
+        conn.executemany(
+            "INSERT INTO kullanicilar (kullanici_adi, sifre, rol) VALUES (?, ?, ?)",
+            [
+                ("admin", "Xk9#mQ2$vL7!pR4z", "yönetici"),  # tahmin edilemeyecek kadar güçlü bir şifre
+                ("ceylin", "kedi2024", "kullanıcı"),
+                ("ahmet", "ahmet123", "kullanıcı"),
+            ],
+        )
+
+
+# ---------------------------------------------------------------- Sayfalar
+@app.route("/", methods=["GET", "POST"])
+def login():
+    hata = None
+    sorgu = None
+
+    if request.method == "POST":
+        kullanici_adi = request.form.get("kullanici_adi", "")
+        sifre = request.form.get("sifre", "")
+
+        # ❌ ESKİ (AÇIK): Girdi doğrudan SQL metninin içine yapıştırılıyordu. SQL Injection'a açıktı.
+        #    sorgu = f"SELECT * FROM kullanicilar WHERE kullanici_adi = '{kullanici_adi}' AND sifre = '{sifre}'"
+        #
+        # ✅ YENİ (GÜVENLİ): Parametreli sorgu. Komutun yapısı sabit; '?' yerine gelen değerler
+        #    HER ZAMAN veri olarak işlenir, asla komut olarak çalışmaz. Tırnak artık zararsız.
+        sorgu = "SELECT * FROM kullanicilar WHERE kullanici_adi = ? AND sifre = ?"
+
+        try:
+            with get_db() as conn:
+                kullanici = conn.execute(sorgu, (kullanici_adi, sifre)).fetchone()
+        except sqlite3.Error as e:
+            kullanici = None
+            hata = f"Veritabanı hatası: {e}"
+
+        if kullanici:
+            session["kullanici_adi"] = kullanici["kullanici_adi"]
+            session["rol"] = kullanici["rol"]
+            return redirect(url_for("panel"))
+        if not hata:
+            hata = "Kullanıcı adı veya şifre hatalı."
+
+    # Eğitim amaçlı: çalıştırılan SQL sorgusunu ekranda gösteriyoruz (gerçek bir sitede asla yapılmaz)
+    return render_template("login.html", hata=hata, sorgu=sorgu)
+
+
+@app.route("/panel")
+def panel():
+    if "kullanici_adi" not in session:
+        return redirect(url_for("login"))
+    return render_template("panel.html", kullanici_adi=session["kullanici_adi"], rol=session["rol"])
+
+
+@app.route("/cikis")
+def cikis():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+if __name__ == "__main__":
+    init_db()
+    # host="127.0.0.1": uygulama SADECE senin bilgisayarından erişilebilir, ağdaki başka kimse ulaşamaz.
+    # debug=False: Flask'ın hata ayıklama modu, sayfadan kod çalıştırmaya izin verdiği için kapalı.
+    app.run(host="127.0.0.1", port=5000, debug=False)

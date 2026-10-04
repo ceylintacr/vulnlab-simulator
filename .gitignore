@@ -1,0 +1,8 @@
+# Her çalıştırmada yeniden üretilen veritabanı
+vulnlab.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
